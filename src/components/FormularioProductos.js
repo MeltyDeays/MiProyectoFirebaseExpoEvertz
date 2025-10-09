@@ -1,37 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, TextInput, Button, StyleSheet, Text } from 'react-native';
-import { db } from '../database/firebaseconfig';
-import { collection, addDoc } from 'firebase/firestore';
 
-const FormularioProductos = ({ cargarDatos }) => {
-  const [nombre, setNombre] = useState('');
-  const [precio, setPrecio] = useState('');
-
-  const [stock, setStock] = useState('');
-
-  const guardarProducto = async () => {
-    try {
-      await addDoc(collection(db, 'productos'), {
-        nombre: nombre,
-        precio: parseFloat(precio),
-
-        stock: parseInt(stock),
-      });
-      alert('Producto agregado con éxito');
-      setNombre('');
-      setPrecio('');
-
-      setStock('');
-      cargarDatos();
-    } catch (error) {
-      alert('Error al registrar el producto:', error);
-    }
-  };
-
+const FormularioProductos = ({ 
+  nuevoProducto, 
+  manejoCambio, 
+  guardarProducto, 
+  actualizarProducto, 
+  modoEdicion 
+}) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Agregar Nuevo Producto</Text>
+        <Text style={styles.title}>
+          {modoEdicion ? 'Actualizar Producto' : 'Agregar Nuevo Producto'}
+        </Text>
       </View>
       
       <View style={styles.formContainer}>
@@ -39,28 +21,31 @@ const FormularioProductos = ({ cargarDatos }) => {
           style={styles.input}
           placeholder="Nombre del producto"
           placeholderTextColor="#9ca3af"
-          value={nombre}
-          onChangeText={setNombre}
+          value={nuevoProducto.nombre}
+          onChangeText={(text) => manejoCambio('nombre', text)}
         />
         <TextInput
           style={styles.input}
           placeholder="Precio"
           placeholderTextColor="#9ca3af"
-          value={precio}
-          onChangeText={setPrecio}
+          value={nuevoProducto.precio}
+          onChangeText={(text) => manejoCambio('precio', text)}
           keyboardType="numeric"
         />
-
         <TextInput
           style={styles.input}
           placeholder="Stock"
           placeholderTextColor="#9ca3af"
-          value={stock}
-          onChangeText={setStock}
+          value={nuevoProducto.stock}
+          onChangeText={(text) => manejoCambio('stock', text)}
           keyboardType="numeric"
         />
         <View style={styles.buttonContainer}>
-          <Button title="Guardar Producto" onPress={guardarProducto} color="#3b82f6" />
+          <Button
+            title={modoEdicion ? "Actualizar" : "Guardar Producto"}
+            onPress={modoEdicion ? actualizarProducto : guardarProducto}
+            color="#3b82f6"
+          />
         </View>
       </View>
     </View>
@@ -71,12 +56,9 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    margin: 12,
+    marginVertical: 12,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 8,
