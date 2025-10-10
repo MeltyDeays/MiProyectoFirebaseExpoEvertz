@@ -1,145 +1,133 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
-import BotonEliminarProducto from './BotonEliminarProducto';
-
-const { width } = Dimensions.get('window');
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 const TablaProductos = ({ productos, eliminarProducto, editarProducto }) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Inventario de Productos</Text>
-      </View>
+    <View style={styles.card}>
+      <Text style={styles.title}>Inventario Actual</Text>
       
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View>
-          {/* Cabecera */}
-          <View style={styles.headerRow}>
-            <Text style={[styles.cell, styles.headerText, { flex: 2 }]}>Nombre</Text>
-            <Text style={[styles.cell, styles.headerText, { flex: 1 }]}>Precio</Text>
-            <Text style={[styles.cell, styles.headerText, { flex: 1 }]}>Stock</Text>
-            <Text style={[styles.cell, styles.headerText, { flex: 1.5 }]}>Acciones</Text>
-          </View>
-          
-          {/* Cuerpo */}
-          <ScrollView style={styles.tableBody} showsVerticalScrollIndicator={false}>
-            {productos.map((producto, index) => (
-              <View style={[styles.row, index % 2 === 0 && styles.evenRow]} key={producto.id}>
-                <Text style={[styles.cell, { flex: 2 }]} numberOfLines={2}>{producto.nombre}</Text>
-                <View style={[styles.cell, { flex: 1, alignItems: 'center' }]}>
-                  <Text style={styles.priceText}>${producto.precio}</Text>
-                </View>
-                <View style={[styles.cell, { flex: 1, alignItems: 'center' }]}>
-                  <Text style={[
-                    styles.stockText,
-                    producto.stock > 10 ? styles.stockHigh : 
-                    producto.stock > 0 ? styles.stockMedium : styles.stockLow
-                  ]}>
-                    {producto.stock}
-                  </Text>
-                </View>
-                <View style={[styles.cell, { flex: 1.5, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }]}>
-                  <TouchableOpacity style={styles.editButton} onPress={() => editarProducto(producto)}>
-                      <Text style={styles.buttonText}>Editar</Text>
-                  </TouchableOpacity>
-                  <BotonEliminarProducto id={producto.id} eliminarProducto={eliminarProducto} />
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+      <View style={styles.table}>
+        {/* Cabecera */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerText, { flex: 3 }]}>Producto</Text>
+          <Text style={[styles.headerText, { flex: 1.5, textAlign: 'center' }]}>Precio</Text>
+          <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>Stock</Text>
+          <Text style={[styles.headerText, { flex: 2, textAlign: 'right' }]}>Acciones</Text>
         </View>
-      </ScrollView>
+        
+        {/* Cuerpo */}
+        <ScrollView>
+          {productos.length > 0 ? productos.map((producto) => (
+            <View style={styles.row} key={producto.id}>
+              <Text style={[styles.cellText, { flex: 3 }]} numberOfLines={1}>{producto.nombre}</Text>
+              <Text style={[styles.cellText, styles.priceText, { flex: 1.5, textAlign: 'center' }]}>C${producto.precio.toFixed(2)}</Text>
+              <View style={[styles.cellText, { flex: 1, alignItems: 'center' }]}>
+                <Text style={[
+                  styles.stockBadge,
+                  producto.stock > 10 ? styles.stockHigh : 
+                  producto.stock > 0 ? styles.stockMedium : styles.stockLow
+                ]}>
+                  {producto.stock}
+                </Text>
+              </View>
+              <View style={styles.actionCell}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => editarProducto(producto)}>
+                  <Ionicons name="pencil-outline" size={20} color="#3b82f6" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} onPress={() => eliminarProducto(producto.id)}>
+                  <Ionicons name="trash-outline" size={20} color="#dc2626" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )) : (
+            <Text style={styles.emptyText}>No hay productos en el inventario.</Text>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        marginVertical: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 5,
-        maxHeight: 400, // Altura máxima para la tabla
-      },
-      header: {
-        backgroundColor: '#f8fafc',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-      },
-      title: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1e293b',
-        textAlign: 'center',
-      },
-      headerRow: {
-        flexDirection: 'row',
-        backgroundColor: '#f1f5f9',
-        paddingVertical: 8,
-        borderBottomWidth: 2,
-        borderBottomColor: '#e2e8f0',
-      },
-      tableBody: {
-        // El scroll vertical es manejado por el ScrollView que envuelve la tabla
-      },
-      row: {
-        flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-        paddingVertical: 8,
-        alignItems: 'center',
-      },
-      evenRow: {
-        backgroundColor: '#f8fafc',
-      },
-      cell: {
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        fontSize: 13,
-        color: '#1e293b',
-        textAlign: 'center',
-      },
-      headerText: {
-        fontWeight: '600',
-        color: '#334155',
-        textAlign: 'center',
-        fontSize: 13,
-      },
-      priceText: {
-        color: '#059669',
-        fontWeight: '600',
-        fontSize: 12,
-      },
-      stockText: {
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-        fontWeight: '600',
-        fontSize: 12,
-        textAlign: 'center',
-      },
-      stockHigh: { backgroundColor: '#d1fae5', color: '#059669' },
-      stockMedium: { backgroundColor: '#fef3c7', color: '#d97706' },
-      stockLow: { backgroundColor: '#fee2e2', color: '#dc2626' },
-      editButton: {
-        backgroundColor: '#3b82f6',
-        paddingVertical: 4,
-        paddingHorizontal: 10,
-        borderRadius: 6,
-      },
-      buttonText: {
-        color: 'white',
-        fontWeight: '500',
-        fontSize: 12,
-      },
+    card: {
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      marginVertical: 12,
+      paddingVertical: 20,
+      maxHeight: 500,
+      ...Platform.select({
+          ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+          android: { elevation: 5 },
+          web: { boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' }
+      })
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: '#1e293b',
+      textAlign: 'center',
+      marginBottom: 16,
+      paddingHorizontal: 20,
+    },
+    table: {
+      paddingHorizontal: 16,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      borderBottomWidth: 2,
+      borderBottomColor: '#e2e8f0',
+      paddingBottom: 12,
+      marginBottom: 8,
+    },
+    headerText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#64748b',
+      textTransform: 'uppercase',
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f1f5f9',
+    },
+    cellText: {
+      fontSize: 14,
+      color: '#334155',
+    },
+    priceText: {
+      fontWeight: '600',
+      color: '#166534',
+    },
+    stockBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      fontWeight: 'bold',
+      fontSize: 12,
+      overflow: 'hidden',
+    },
+    stockHigh: { backgroundColor: '#dcfce7', color: '#166534' },
+    stockMedium: { backgroundColor: '#fef9c3', color: '#b45309' },
+    stockLow: { backgroundColor: '#fee2e2', color: '#b91c1c' },
+    actionCell: {
+      flex: 2,
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      gap: 12,
+    },
+    iconButton: {
+      padding: 4,
+    },
+    emptyText: {
+      textAlign: 'center',
+      padding: 20,
+      color: '#64748b',
+      fontStyle: 'italic',
+    },
 });
 
 export default TablaProductos;

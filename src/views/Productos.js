@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, SafeAreaView, Text, Alert } from 'react-native';
-import { db } from '../database/firebaseconfig';
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { View, StyleSheet, Text, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { db } from '../../firebase';
+import { collection, onSnapshot, doc, deleteDoc, addDoc, updateDoc, query } from 'firebase/firestore';
 
 import FormularioProductos from '../components/FormularioProductos';
 import TablaProductos from '../components/TablaProductos';
@@ -12,30 +12,34 @@ const Productos = () => {
   const [modoEdicion, setModoEdicion] = useState(false);
   const [productoId, setProductoId] = useState(null);
 
-  const cargarDatos = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'productos'));
+  useEffect(() => {
+    const q = query(collection(db, 'productos'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const data = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setProductos(data);
-    } catch (error) {
-      console.error('Error al obtener documentos:', error);
-    }
-  };
+    }, (error) => {
+      console.error("Error al obtener productos en tiempo real:", error);
+    });
 
-  useEffect(() => {
-    cargarDatos();
+    return () => unsubscribe();
   }, []);
 
   const manejoCambio = (nombre, valor) => {
     setNuevoProducto(prev => ({ ...prev, [nombre]: valor }));
   };
+  
+  const limpiarFormulario = () => {
+    setModoEdicion(false);
+    setProductoId(null);
+    setNuevoProducto({ nombre: '', precio: '', stock: '' });
+  };
 
   const guardarProducto = async () => {
     if (!nuevoProducto.nombre || !nuevoProducto.precio || !nuevoProducto.stock) {
-      Alert.alert("Error", "Por favor, completa todos los campos.");
+      Alert.alert("Atención", "Por favor, completa todos los campos.");
       return;
     }
     try {
@@ -44,11 +48,11 @@ const Productos = () => {
         precio: parseFloat(nuevoProducto.precio),
         stock: parseInt(nuevoProducto.stock, 10),
       });
-      cargarDatos();
-      setNuevoProducto({ nombre: '', precio: '', stock: '' }); // Limpiar formulario
+      limpiarFormulario();
       Alert.alert("Éxito", "Producto agregado correctamente.");
     } catch (error) {
       console.error('Error al registrar el producto:', error);
+      Alert.alert("Error", "No se pudo guardar el producto.");
     }
   };
 
@@ -64,7 +68,7 @@ const Productos = () => {
 
   const actualizarProducto = async () => {
     if (!nuevoProducto.nombre || !nuevoProducto.precio || !nuevoProducto.stock) {
-      Alert.alert("Error", "Por favor, completa todos los campos.");
+      Alert.alert("Atención", "Por favor, completa todos los campos.");
       return;
     }
     try {
@@ -74,72 +78,68 @@ const Productos = () => {
         precio: parseFloat(nuevoProducto.precio),
         stock: parseInt(nuevoProducto.stock, 10),
       });
-      
-      setModoEdicion(false);
-      setProductoId(null);
-      setNuevoProducto({ nombre: '', precio: '', stock: '' });
-      cargarDatos();
+      limpiarFormulario();
       Alert.alert("Éxito", "Producto actualizado correctamente.");
     } catch (error) {
       console.error("Error al actualizar producto:", error);
+      Alert.alert("Error", "No se pudo actualizar el producto.");
     }
+  };
+
+  const confirmarEliminacion = (id) => {
+    Alert.alert(
+        "Eliminar Producto",
+        "¿Estás seguro de que quieres eliminar este producto?",
+        [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Eliminar", style: "destructive", onPress: () => eliminarProducto(id) }
+        ]
+    );
   };
 
   const eliminarProducto = async (id) => {
     try {
       await deleteDoc(doc(db, 'productos', id));
-      cargarDatos();
       Alert.alert("Éxito", "Producto eliminado.");
     } catch (error) {
       console.error('Error al eliminar:', error);
+      Alert.alert("Error", "No se pudo eliminar el producto.");
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.mainTitle}>Gestión de Inventario</Text>
-        </View>
-
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.flexContainer}
+    >
+      <ScrollView style={styles.container}>
         <FormularioProductos
           nuevoProducto={nuevoProducto}
           manejoCambio={manejoCambio}
           guardarProducto={guardarProducto}
           actualizarProducto={actualizarProducto}
           modoEdicion={modoEdicion}
+          cancelarEdicion={limpiarFormulario}
         />
 
         <TablaProductos
           productos={productos}
-          eliminarProducto={eliminarProducto}
+          eliminarProducto={confirmarEliminacion}
           editarProducto={editarProducto}
         />
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  flexContainer: {
     flex: 1,
     backgroundColor: '#f1f5f9',
   },
   container: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 8,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 6,
-  },
-  mainTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1e293b',
-    textAlign: 'center',
+    paddingHorizontal: 16,
   },
 });
 
