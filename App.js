@@ -1,59 +1,83 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons'; // Importamos la librería de íconos
+import { Ionicons } from '@expo/vector-icons';
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
-// Importamos tus dos vistas principales
+// ⚠️ ¡IMPORTANTE! Revisa que la ruta a tu archivo firebase sea correcta.
+import { auth } from './firebase'; 
+
+// Importa tus vistas
 import Usuarios from './src/views/Usuarios'; 
 import Productos from './src/views/Productos'; 
+import Login from './src/views/Login';
 
-// Creamos una instancia del navegador de pestañas
 const Tab = createBottomTabNavigator();
 
-export default function App() {
+// Componente que contiene la navegación por pestañas
+function MainAppNavigator({ cerrarSesion }) {
   return (
-    // NavigationContainer es el contenedor principal que maneja la navegación
-    <NavigationContainer>
-      {/* Tab.Navigator es el componente que renderiza la barra de pestañas */}
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          // Esta función define qué ícono mostrar para cada pestaña
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
-
-            if (route.name === 'Usuarios') {
-              // Si la pestaña está activa (focused), muestra el ícono relleno, si no, el de contorno
-              iconName = focused ? 'people' : 'people-outline';
-            } else if (route.name === 'Productos') {
-              iconName = focused ? 'cube' : 'cube-outline';
-            }
-
-            // Devolvemos el componente de ícono con el nombre y color correctos
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          // Estilos para la barra de pestañas
-          tabBarActiveTintColor: '#c53030', // Color del ícono activo
-          tabBarInactiveTintColor: 'gray',   // Color del ícono inactivo
-          headerStyle: {
-            backgroundColor: '#f0f2f5', // Color del encabezado
-          },
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        })}
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'Usuarios') {
+            iconName = focused ? 'people' : 'people-outline';
+          } else if (route.name === 'Productos') {
+            iconName = focused ? 'cube' : 'cube-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#2563eb', // Color actualizado
+        tabBarInactiveTintColor: 'gray',
+        headerStyle: { backgroundColor: '#f1f5f9' },
+        headerTitleStyle: { fontWeight: 'bold' },
+      })}
+    >
+      <Tab.Screen 
+        name="Usuarios" 
+        component={Usuarios} 
+        options={{ title: 'Gestión de Usuarios' }} 
+      />
+      {/* Usamos una función para pasar la prop 'cerrarSesion' a Productos */}
+      <Tab.Screen 
+        name="Productos" 
+        options={{ title: 'Inventario de Productos' }}
       >
-        {/* Definimos cada una de las pantallas que estarán en la barra */}
-        <Tab.Screen 
-          name="Usuarios" 
-          component={Usuarios} 
-          options={{ title: 'Gestión de Usuarios' }} // Título en el encabezado
-        />
-        <Tab.Screen 
-          name="Productos" 
-          component={Productos} 
-          options={{ title: 'Inventario de Productos' }} // Título en el encabezado
-        />
-      </Tab.Navigator>
+        {(props) => <Productos {...props} cerrarSesion={cerrarSesion} />}
+      </Tab.Screen>
+    </Tab.Navigator>
+  );
+}
+
+// Componente principal que maneja la lógica de autenticación
+export default function App() {
+  const [usuario, setUsuario] = useState(null);
+
+  useEffect(() => {
+    // Firebase nos dice si el usuario inició o cerró sesión
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUsuario(user);
+    });
+    return unsubscribe; // Limpia el listener al desmontar
+  }, []);
+
+  const cerrarSesion = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
+  };
+
+  return (
+    <NavigationContainer>
+      {/* Si hay un usuario, muestra la app principal. Si no, muestra el Login. */}
+      {usuario ? (
+        <MainAppNavigator cerrarSesion={cerrarSesion} />
+      ) : (
+        <Login onLoginSuccess={() => { /* No hace falta hacer nada aquí, el listener ya detecta el cambio */ }} />
+      )}
     </NavigationContainer>
   );
 }
