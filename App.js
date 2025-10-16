@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -32,6 +33,12 @@ function MainAppNavigator({ cerrarSesion }) {
         tabBarInactiveTintColor: 'gray',
         headerStyle: { backgroundColor: '#f1f5f9' },
         headerTitleStyle: { fontWeight: 'bold' },
+        // Agregamos el botón de cerrar sesión en la cabecera
+        headerRight: () => (
+          <TouchableOpacity onPress={cerrarSesion} style={{ marginRight: 15 }}>
+            <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+          </TouchableOpacity>
+        ),
       })}
     >
       <Tab.Screen 
@@ -39,13 +46,11 @@ function MainAppNavigator({ cerrarSesion }) {
         component={Usuarios} 
         options={{ title: 'Gestión de Usuarios' }} 
       />
-      {/* Usamos una función para pasar la prop 'cerrarSesion' a Productos */}
       <Tab.Screen 
         name="Productos" 
+        component={Productos}
         options={{ title: 'Inventario de Productos' }}
-      >
-        {(props) => <Productos {...props} cerrarSesion={cerrarSesion} />}
-      </Tab.Screen>
+      />
     </Tab.Navigator>
   );
 }

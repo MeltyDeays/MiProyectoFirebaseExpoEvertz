@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
-// 1. Importa 'Button'
-import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Button } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { db } from '../../firebase';
 import { collection, onSnapshot, doc, deleteDoc, addDoc, updateDoc, query } from 'firebase/firestore';
 
 import FormularioProductos from '../components/FormularioProductos';
 import TablaProductos from '../components/TablaProductos';
 
-// 2. Recibe { cerrarSesion } en los props
-const Productos = ({ cerrarSesion }) => {
+const Productos = () => {
   const [productos, setProductos] = useState([]);
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio: '', stock: '' });
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -117,11 +115,6 @@ const Productos = ({ cerrarSesion }) => {
       style={styles.flexContainer}
     >
       <ScrollView style={styles.container}>
-        {/* 3. Agrega el botón aquí */}
-        <View style={styles.logoutButton}>
-          <Button title="Cerrar Sesión" onPress={cerrarSesion} color="#ef4444" />
-        </View>
-
         <FormularioProductos
           nuevoProducto={nuevoProducto}
           manejoCambio={manejoCambio}
@@ -150,10 +143,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
-  // 4. Estilos para el botón
-  logoutButton: {
-    marginVertical: 15,
-  }
 });
 
 export default Productos;
