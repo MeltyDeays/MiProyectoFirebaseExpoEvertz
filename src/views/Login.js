@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { Ionicons } from '@expo/vector-icons';
 // ⚠️ ¡OJO! Asegúrate que la ruta a tu configuración de firebase sea correcta.
 // Si tu archivo se llama 'firebase.js' en la raíz, la ruta sería '../../firebase'
-import { auth } from "../../firebase"; // <--- REVISA ESTA RUTA
+import { auth } from "../../firebaseconfig"; // <--- REVISA ESTA RUTA
 
 const Login = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState("");

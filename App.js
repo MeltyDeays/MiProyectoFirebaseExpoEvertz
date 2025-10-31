@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 // ⚠️ ¡IMPORTANTE! Revisa que la ruta a tu archivo firebase sea correcta.
-import { auth } from './firebase'; 
+import { auth } from './firebaseconfig'; 
 
 // Importa tus vistas
 import Usuarios from './src/views/Usuarios'; 
