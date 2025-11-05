@@ -1,31 +1,56 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Button, Alert, Text } from "react-native"; 
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import FormularioProductos from "../components/FormularioProductos";
 import TablaProductos from "../components/TablaProductos.js";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import * as Clipboard from "expo-clipboard";
+import * as Print from 'expo-print'; // <-- Importación PDF
+
+// Función para cargar datos de UNA colección (JSON)
+const cargarDatosFirebase = async (nombreColeccion) => {
+  if (!nombreColeccion || typeof nombreColeccion !== 'string') {
+    console.error("Error: Se requiere un nombre de colección válido.");
+    return;
+  }
+  try {
+    const datosExportados = {};
+    const snapshot = await getDocs(collection(db, nombreColeccion));
+    datosExportados[nombreColeccion] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    return datosExportados;
+  } catch (error) {
+    console.error(`Error extrayendo datos de la colección '${nombreColeccion}':`, error);
+  }
+};
 
 const Productos = () => {
-  console.log('Renderizando componente Productos');
   const [productos, setProductos] = useState([]);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [productoId, setProductoId] = useState(null);
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: "",
     precio: "",
-    });
+    stock: "" // <-- Añadido para que coincida con el formulario
+  });
 
   const cargarDatos = async () => {
     try {
-      console.log('Entrando a cargarDatos');
-    
-      const querySnapshot = await getDocs(collection(db, "productos")); 
-      const data = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setProductos(data);
-      console.log("Productos traídos:", data);
+      const resultado = await cargarDatosFirebase("productos");
+      if (resultado && resultado.productos) {
+        setProductos(resultado.productos);
+      } else {
+        const querySnapshot = await getDocs(collection(db, "productos")); 
+        const data = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setProductos(data);
+      }
     } catch (error) {
       console.error("Error al obtener documentos: ", error);
     }
@@ -33,9 +58,8 @@ const Productos = () => {
 
   const eliminarProducto = async (id) => {
     try {
-
       await deleteDoc(doc(db, "productos", id));
-      cargarDatos(); // recarga lista 
+      cargarDatos(); 
     } catch (error) {
       console.error("Error al eliminar:", error);
     }
@@ -50,16 +74,16 @@ const Productos = () => {
 
   const guardarProducto = async () => {
     try {
-      if (nuevoProducto.nombre && nuevoProducto.precio) {
-        
+      if (nuevoProducto.nombre && nuevoProducto.precio && nuevoProducto.stock) {
         await addDoc(collection(db, "productos"), {
           nombre: nuevoProducto.nombre,
           precio: parseFloat(nuevoProducto.precio),
+          stock: parseInt(nuevoProducto.stock, 10) // <-- Añadido
         });
-        cargarDatos(); //Recarga lista
-        setNuevoProducto({nombre: "", precio: ""});
+        cargarDatos(); 
+        setNuevoProducto({nombre: "", precio: "", stock: ""}); // <-- Limpiar
       } else {
-        alert("Por favor, complete todos loscampos.");
+        alert("Por favor, complete todos los campos.");
       }
     } catch (error) {
       console.error("Error al registrar producto: ", error);
@@ -68,16 +92,16 @@ const Productos = () => {
 
   const actualizarProducto = async () => {
     try{
-      if(nuevoProducto.nombre && nuevoProducto.precio) {
-    
+      if(nuevoProducto.nombre && nuevoProducto.precio && nuevoProducto.stock) {
         await updateDoc(doc(db, "productos", productoId), {
           nombre: nuevoProducto.nombre,
           precio: parseFloat(nuevoProducto.precio),
+          stock: parseInt(nuevoProducto.stock, 10) // <-- Añadido
         });
-        setNuevoProducto({nombre: "", precio: ""});
+        setNuevoProducto({nombre: "", precio: "", stock: ""}); // <-- Limpiar
         setModoEdicion(false); 
         setProductoId(null);
-        cargarDatos(); //Recargar Lista
+        cargarDatos(); 
       } else {
         alert("Por favor, complete todos los campos");
       }
@@ -90,139 +114,240 @@ const Productos = () => {
     setNuevoProducto({
       nombre: producto.nombre,
       precio: producto.precio.toString(),
+      stock: (producto.stock || 0).toString() // <-- Añadido
     });
     setProductoId(producto.id);
     setModoEdicion(true)
   };
   
-  const pruebaConsulta1 = async () => {
-    try {
-      console.log('Entrando a pruebaConsulta1');
-      const q = query(
-        collection(db, "ciudades"), // Esta ya estaba bien (minúscula)
-        where("pais", "==", "Guatemala"),
-        orderBy("poblacion", "desc"),
-        limit(2)
-      );
-      const snapshot = await getDocs(q);
-      console.log('pruebaConsulta1 snapshot size:', snapshot.size);
-      console.log("---------Consulta1--------------")
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        console.log(`ID: ${doc.id}, Nombre: ${data.nombre}`)
-      })
-    }
-    catch (error) {
-      console.error('Error en pruebaConsulta1:', error);
-    }
-  }
-
-  useEffect(() => {
-    console.log('useEffect Productos montado - ejecutando cargarDatos y pruebaConsulta1');
+  //... (tus funciones de consulta 'pruebaConsulta1' y 'ejecutarConsultasSolicitadas' van aquí)
+   useEffect(() => {
     cargarDatos();
-    pruebaConsulta1();
+    // pruebaConsulta1(); // Descomenta si las necesitas
+    // ejecutarConsultasSolicitadas(); // Descomenta si las necesitas
   }, []);
 
-  const ejecutarConsultasSolicitadas = async () => {
+  // --- CÓDIGO DE EXPORTACIÓN (JSON) ---
+
+  const colecciones = ["productos", "usuarios", "ciudades"]; 
+
+  const exportarColeccion = async (nombreColeccion) => {
     try {
-      // 1) Las 2 ciudades más pobladas de Guatemala (población desc, limit 2)
-      console.log('--- 1) Top 2 ciudades Guatemala (población desc) ---');
-      try {
-        const q1 = query(collection(db, 'ciudades'), where('pais', '==', 'Guatemala'), orderBy('poblacion', 'desc'), limit(2));
-        const s1 = await getDocs(q1);
-        s1.forEach(d => console.log(d.id, d.data()));
-      } catch (err) {
-        console.error('Error consulta 1:', err);
+      const datos = await cargarDatosFirebase(nombreColeccion); 
+      if (!datos || Object.keys(datos).length === 0) {
+        Alert.alert("Error", `No se pudieron cargar datos para '${nombreColeccion}'`);
+        return;
       }
-
-      // 2) Ciudades de Honduras con población > 700k, ordenadas por nombre asc, limit 3
-      console.log('--- 2) Honduras población >700k, ordenar por nombre asc, limit 3 ---');
-      try {
-        const q2 = query(collection(db, 'ciudades'), where('pais', '==', 'Honduras'), where('poblacion', '>', 700000));
-        const s2 = await getDocs(q2);
-        const arr2 = [];
-        s2.forEach(d => arr2.push({ id: d.id, ...d.data() }));
-        arr2.sort((a,b) => a.nombre.localeCompare(b.nombre));
-        arr2.slice(0,3).forEach(d => console.log(d.id, d));
-      } catch (err) {
-        console.error('Error consulta 2:', err);
+      const jsonString = JSON.stringify(datos, null, 2);
+      const baseFileName = `datos_${nombreColeccion}.json`;
+      
+      await Clipboard.setStringAsync(jsonString);
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Error", "La función Compartir/Guardar no está disponible.");
+        return;
       }
-
-      // 4) Ciudades centroamericanas con población <= 300k, ordenadas por país desc, limit 4
-      console.log('--- 4) Ciudades centroamericanas <=300k, ordenar por país desc, limit 4 ---');
-      try {
-        const paisesCA = ['Guatemala','Honduras','El Salvador','Nicaragua','Costa Rica','Panama','Belize'];
-        const q4 = query(collection(db, 'ciudades'), where('poblacion', '<=', 300000), where('pais', 'in', paisesCA));
-        const s4 = await getDocs(q4);
-        const arr4 = [];
-        s4.forEach(d => arr4.push({ id: d.id, ...d.data() }));
-        arr4.sort((a,b) => b.pais.localeCompare(a.pais)); // país desc
-        arr4.slice(0,4).forEach(d => console.log(d.id, d));
-      } catch (err) {
-        console.error('Error consulta 4:', err);
-      }
-
-      // 5) 3 ciudades con población > 900k, ordenadas por nombre
-      console.log('--- 5) 3 ciudades con población >900k ordenadas por nombre ---');
-      try {
-        const q5 = query(collection(db, 'ciudades'), where('poblacion', '>', 900000));
-        const s5 = await getDocs(q5);
-        const arr5 = [];
-        s5.forEach(d => arr5.push({ id: d.id, ...d.data() }));
-        arr5.sort((a,b) => a.nombre.localeCompare(b.nombre));
-        arr5.slice(0,3).forEach(d => console.log(d.id, d));
-      } catch (err) {
-        console.error('Error consulta 5:', err);
-      }
-
-      // 6) Lista ciudades guatemaltecas ordenadas por población desc, limit(5) por seguridad
-      console.log('--- 6) Ciudades Guatemala (población desc) limit 5 ---');
-      try {
-        const q6 = query(collection(db, 'ciudades'), where('pais', '==', 'Guatemala'), orderBy('poblacion', 'desc'), limit(5));
-        const s6 = await getDocs(q6);
-        s6.forEach(d => console.log(d.id, d.data()));
-      } catch (err) {
-        console.error('Error consulta 6:', err);
-      }
-
-      // 7) Ciudades con población entre 200k y 600k, ordenadas por país asc, limit 5
-      console.log('--- 7) Ciudades 200k-600k ordenadas por país asc limit 5 ---');
-      try {
-        const q7 = query(collection(db, 'ciudades'), where('poblacion', '>=', 200000), where('poblacion', '<=', 600000));
-        const s7 = await getDocs(q7);
-        const arr7 = [];
-        s7.forEach(d => arr7.push({ id: d.id, ...d.data() }));
-        arr7.sort((a,b) => a.pais.localeCompare(b.pais));
-        arr7.slice(0,5).forEach(d => console.log(d.id, d));
-      } catch (err) {
-        console.error('Error consulta 7:', err);
-      }
-
-      // 8) Top 5 ciudades con mayor población en general, ordenadas por región desc luego por población desc
-      console.log('--- 8) Top 5 por población, orden por región desc (si existe) ---');
-      try {
-        const q8 = query(collection(db, 'ciudades'));
-        const s8 = await getDocs(q8);
-        const arr8 = [];
-        s8.forEach(d => arr8.push({ id: d.id, ...d.data() }));
-        arr8.sort((a,b) => {
-          const regA = a.region || a.pais || '';
-          const regB = b.region || b.pais || '';
-          if (regA !== regB) return regB.localeCompare(regA);
-          return (b.poblacion || 0) - (a.poblacion || 0);
-        });
-        arr8.slice(0,5).forEach(d => console.log(d.id, d));
-      } catch (err) {
-        console.error('Error consulta 8:', err);
-      }
+      const fileUri = FileSystem.cacheDirectory + baseFileName;
+      await FileSystem.writeAsStringAsync(fileUri, jsonString);
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: `Compartir datos de ${nombreColeccion} (JSON)`
+      });
+      Alert.alert("Éxito", `Datos de '${nombreColeccion}' copiados y listos para compartir.`);
     } catch (error) {
-      console.error('Error ejecutando consultas solicitadas:', error);
+      console.error(`Error al exportar ${nombreColeccion}:`, error);
+      Alert.alert("Error al exportar", error.message);
     }
-  }
+  };
 
-  useEffect(() => {
-    ejecutarConsultasSolicitadas();
-  }, []);
+  const cargarTODOSDatosFirebase = async () => {
+    try {
+      const datosExportados = {};
+      for (const col of colecciones) {
+        const datosCol = await cargarDatosFirebase(col);
+        if (datosCol) {
+          Object.assign(datosExportados, datosCol);
+        }
+      }
+      return datosExportados;
+    } catch (error) {
+      console.error("Error extrayendo todos los datos:", error);
+      return null;
+    }
+  };
+
+  const exportarTodosLosDatos = async () => {
+    try {
+      const datos = await cargarTODOSDatosFirebase(); 
+      if (!datos || Object.keys(datos).length === 0) {
+        Alert.alert("Error", "No se pudieron cargar los datos.");
+        return;
+      }
+      const jsonString = JSON.stringify(datos, null, 2);
+      const baseFileName = "datos_firebase_TODOS.json";
+      
+      await Clipboard.setStringAsync(jsonString);
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Error", "La función Compartir/Guardar no está disponible.");
+        return;
+      }
+      const fileUri = FileSystem.cacheDirectory + baseFileName;
+      await FileSystem.writeAsStringAsync(fileUri, jsonString);
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: 'Compartir TODOS los datos de Firebase (JSON)'
+      });
+      Alert.alert("Éxito", "Todos los datos han sido copiados y están listos para compartir.");
+    } catch (error) {
+      console.error("Error al exportar o compartir todo:", error);
+      Alert.alert("Error al exportar todo", error.message);
+    }
+  };
+
+  // --- NUEVAS FUNCIONES PARA PDF ---
+
+  const generarHTMLParaProductos = (data) => {
+    let tableRows = '';
+    data.forEach(prod => {
+      const precio = typeof prod.precio === 'number' ? `C$${prod.precio.toFixed(2)}` : (prod.precio || '');
+      tableRows += `
+        <tr>
+          <td>${prod.nombre || ''}</td>
+          <td>${precio}</td>
+          <td>${prod.stock || '0'}</td>
+        </tr>
+      `;
+    });
+
+    return `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: sans-serif; margin: 20px; }
+            h1 { text-align: center; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #f4f4f4; color: #333; }
+          </style>
+        </head>
+        <body>
+          <h1>Reporte de Productos</h1>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Precio</th>
+                <th>Stock</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+  };
+
+  const exportarProductosPDF = async () => {
+    if (productos.length === 0) {
+      Alert.alert("Sin datos", "No hay productos para exportar a PDF.");
+      return;
+    }
+    try {
+      const htmlContent = generarHTMLParaProductos(productos);
+      const { uri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Error", "La función Compartir no está disponible.");
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Exportar Productos (PDF)',
+        UTI: '.pdf'
+      });
+    } catch (error) {
+      console.error("Error al generar PDF de productos:", error);
+      Alert.alert("Error", "No se pudo generar el PDF: " + error.message);
+    }
+  };
+
+  const generarHTMLParaTodo = (datos) => {
+      let htmlContent = `
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              body { font-family: sans-serif; margin: 20px; }
+              h1 { text-align: center; color: #1e3a8a; }
+              h2 { text-transform: capitalize; color: #333; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; word-break: break-word; }
+              th { background-color: #f4f4f4; color: #333; }
+              tr:nth-child(even) { background-color: #f9f9f9; }
+            </style>
+          </head>
+          <body>
+            <h1>Reporte Completo de Firebase</h1>
+      `;
+
+      for (const coleccionNombre in datos) {
+        const items = datos[coleccionNombre];
+        if (!items || items.length === 0) {
+          htmlContent += `<h2>${coleccionNombre}</h2><p>No hay datos.</p>`;
+          continue;
+        }
+
+        htmlContent += `<h2>${coleccionNombre}</h2>`;
+        htmlContent += `<table><thead><tr>`;
+
+        const headers = Object.keys(items[0]);
+        headers.forEach(header => {
+          htmlContent += `<th>${header}</th>`;
+        });
+        htmlContent += `</tr></thead><tbody>`;
+
+        items.forEach(item => {
+          htmlContent += `<tr>`;
+          headers.forEach(header => {
+            let valor = item[header];
+            if (typeof valor === 'object' && valor !== null) {
+              valor = JSON.stringify(valor);
+            }
+            htmlContent += `<td>${valor || ''}</td>`;
+          });
+          htmlContent += `</tr>`;
+        });
+        htmlContent += `</tbody></table>`;
+      }
+      htmlContent += `</body></html>`;
+      return htmlContent;
+  };
+  
+  const exportarTodoPDF = async () => {
+      const datos = await cargarTODOSDatosFirebase();
+      if (!datos || Object.keys(datos).length === 0) {
+        Alert.alert("Sin datos", "No hay datos de ninguna colección para exportar.");
+        return;
+      }
+      try {
+        const htmlContent = generarHTMLParaTodo(datos);
+        const { uri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
+        if (!(await Sharing.isAvailableAsync())) {
+          Alert.alert("Error", "La función Compartir no está disponible.");
+          return;
+        }
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Exportar Todo (PDF)',
+          UTI: '.pdf'
+        });
+      } catch (error) {
+        console.error("Error al generar PDF de TODO:", error);
+        Alert.alert("Error", "No se pudo generar el PDF: " + error.message);
+      }
+  };
+
 
   return (
     <View style={styles.container}>
@@ -232,7 +357,54 @@ const Productos = () => {
         guardarProducto={guardarProducto}
         actualizarProducto={actualizarProducto}
         modoEdicion={modoEdicion}
-        />
+        cancelarEdicion={() => { // <-- Añadido Cancelar
+          setNuevoProducto({nombre: "", precio: "", stock: ""});
+          setModoEdicion(false);
+          setProductoId(null);
+        }}
+      />
+
+      {/* --- BLOQUE DE BOTONES (ACTUALIZADO) --- */}
+      <View style={{ marginVertical: 12, padding: 10, backgroundColor: '#f9fafb', borderRadius: 8, elevation: 2 }}>
+        <Text style={{fontSize: 16, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, color: '#374151'}}>
+          Opciones de Exportación
+        </Text>
+        <View style={{gap: 8}}>
+          <Button 
+            title="Exportar 'productos' (JSON)" 
+            onPress={() => exportarColeccion("productos")} 
+            color="#3b82f6"
+          />
+          <Button 
+            title="Exportar 'usuarios' (JSON)" 
+            onPress={() => exportarColeccion("usuarios")} 
+            color="#1d4ed8"
+          />
+           <Button 
+            title="Exportar 'ciudades' (JSON)" 
+            onPress={() => exportarColeccion("ciudades")} 
+            color="#047857"
+          />
+          <Button 
+            title="Exportar TODO (JSON)" 
+            onPress={exportarTodosLosDatos} 
+            color="#166534"
+          />
+          {/* --- NUEVOS BOTONES PDF --- */}
+          <Button 
+            title="Exportar Productos (PDF)" 
+            onPress={exportarProductosPDF} 
+            color="#ef4444" // Rojo
+          />
+           <Button 
+            title="Exportar TODO (PDF)" 
+            onPress={exportarTodoPDF} 
+            color="#b91c1c" // Rojo Oscuro
+          />
+        </View>
+      </View>
+      {/* --- FIN BLOQUE DE BOTONES --- */}
+
       <TablaProductos 
         productos={productos} 
         eliminarProducto={eliminarProducto}
