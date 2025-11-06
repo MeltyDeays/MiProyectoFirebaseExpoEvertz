@@ -1,32 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Button, Alert, Text } from "react-native"; 
 import { db } from "../../firebaseconfig";
-import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore'; // Imports limpiados
 import FormularioProductos from "../components/FormularioProductos";
 import TablaProductos from "../components/TablaProductos.js";
-import * as FileSystem from "expo-file-system/legacy";
+import * as Print from 'expo-print';
 import * as Sharing from "expo-sharing";
-import * as Clipboard from "expo-clipboard";
-import * as Print from 'expo-print'; // <-- Importación PDF
 
-// Función para cargar datos de UNA colección (JSON)
-const cargarDatosFirebase = async (nombreColeccion) => {
-  if (!nombreColeccion || typeof nombreColeccion !== 'string') {
-    console.error("Error: Se requiere un nombre de colección válido.");
-    return;
-  }
-  try {
-    const datosExportados = {};
-    const snapshot = await getDocs(collection(db, nombreColeccion));
-    datosExportados[nombreColeccion] = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    return datosExportados;
-  } catch (error) {
-    console.error(`Error extrayendo datos de la colección '${nombreColeccion}':`, error);
-  }
-};
+// --- ¡IMPORTANDO LAS FUNCIONES CENTRALES! ---
+// (Ajusta la ruta a tu archivo exportUtils.js)
+import { 
+  cargarDatosFirebase,
+  exportarColeccionJSON,
+  exportarTodosLosDatosJSON,
+  exportarTodoPDF,
+  exportarDatosExcel // <-- ¡La nueva función de Excel!
+} from '../utils/exportUtils'; // <-- AJUSTA ESTA RUTA
+
 
 const Productos = () => {
   const [productos, setProductos] = useState([]);
@@ -35,15 +25,20 @@ const Productos = () => {
   const [nuevoProducto, setNuevoProducto] = useState({
     nombre: "",
     precio: "",
-    stock: "" // <-- Añadido para que coincida con el formulario
+    stock: ""
   });
+  
+  // Lista de colecciones para exportar TODO
+  const colecciones = ["productos", "usuarios", "ciudades"]; 
 
   const cargarDatos = async () => {
     try {
-      const resultado = await cargarDatosFirebase("productos");
+      // Usamos la función importada
+      const resultado = await cargarDatosFirebase("productos"); 
       if (resultado && resultado.productos) {
         setProductos(resultado.productos);
       } else {
+        // Fallback por si acaso
         const querySnapshot = await getDocs(collection(db, "productos")); 
         const data = querySnapshot.docs.map((doc) => ({
           id: doc.id,
@@ -78,10 +73,10 @@ const Productos = () => {
         await addDoc(collection(db, "productos"), {
           nombre: nuevoProducto.nombre,
           precio: parseFloat(nuevoProducto.precio),
-          stock: parseInt(nuevoProducto.stock, 10) // <-- Añadido
+          stock: parseInt(nuevoProducto.stock, 10)
         });
         cargarDatos(); 
-        setNuevoProducto({nombre: "", precio: "", stock: ""}); // <-- Limpiar
+        setNuevoProducto({nombre: "", precio: "", stock: ""});
       } else {
         alert("Por favor, complete todos los campos.");
       }
@@ -96,9 +91,9 @@ const Productos = () => {
         await updateDoc(doc(db, "productos", productoId), {
           nombre: nuevoProducto.nombre,
           precio: parseFloat(nuevoProducto.precio),
-          stock: parseInt(nuevoProducto.stock, 10) // <-- Añadido
+          stock: parseInt(nuevoProducto.stock, 10)
         });
-        setNuevoProducto({nombre: "", precio: "", stock: ""}); // <-- Limpiar
+        setNuevoProducto({nombre: "", precio: "", stock: ""});
         setModoEdicion(false); 
         setProductoId(null);
         cargarDatos(); 
@@ -114,97 +109,19 @@ const Productos = () => {
     setNuevoProducto({
       nombre: producto.nombre,
       precio: producto.precio.toString(),
-      stock: (producto.stock || 0).toString() // <-- Añadido
+      stock: (producto.stock || 0).toString()
     });
     setProductoId(producto.id);
     setModoEdicion(true)
   };
   
-  //... (tus funciones de consulta 'pruebaConsulta1' y 'ejecutarConsultasSolicitadas' van aquí)
    useEffect(() => {
     cargarDatos();
-    // pruebaConsulta1(); // Descomenta si las necesitas
-    // ejecutarConsultasSolicitadas(); // Descomenta si las necesitas
   }, []);
 
-  // --- CÓDIGO DE EXPORTACIÓN (JSON) ---
+  // --- FUNCIONES DE EXPORTACIÓN ESPECÍFICAS DE PRODUCTOS ---
 
-  const colecciones = ["productos", "usuarios", "ciudades"]; 
-
-  const exportarColeccion = async (nombreColeccion) => {
-    try {
-      const datos = await cargarDatosFirebase(nombreColeccion); 
-      if (!datos || Object.keys(datos).length === 0) {
-        Alert.alert("Error", `No se pudieron cargar datos para '${nombreColeccion}'`);
-        return;
-      }
-      const jsonString = JSON.stringify(datos, null, 2);
-      const baseFileName = `datos_${nombreColeccion}.json`;
-      
-      await Clipboard.setStringAsync(jsonString);
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert("Error", "La función Compartir/Guardar no está disponible.");
-        return;
-      }
-      const fileUri = FileSystem.cacheDirectory + baseFileName;
-      await FileSystem.writeAsStringAsync(fileUri, jsonString);
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'application/json',
-        dialogTitle: `Compartir datos de ${nombreColeccion} (JSON)`
-      });
-      Alert.alert("Éxito", `Datos de '${nombreColeccion}' copiados y listos para compartir.`);
-    } catch (error) {
-      console.error(`Error al exportar ${nombreColeccion}:`, error);
-      Alert.alert("Error al exportar", error.message);
-    }
-  };
-
-  const cargarTODOSDatosFirebase = async () => {
-    try {
-      const datosExportados = {};
-      for (const col of colecciones) {
-        const datosCol = await cargarDatosFirebase(col);
-        if (datosCol) {
-          Object.assign(datosExportados, datosCol);
-        }
-      }
-      return datosExportados;
-    } catch (error) {
-      console.error("Error extrayendo todos los datos:", error);
-      return null;
-    }
-  };
-
-  const exportarTodosLosDatos = async () => {
-    try {
-      const datos = await cargarTODOSDatosFirebase(); 
-      if (!datos || Object.keys(datos).length === 0) {
-        Alert.alert("Error", "No se pudieron cargar los datos.");
-        return;
-      }
-      const jsonString = JSON.stringify(datos, null, 2);
-      const baseFileName = "datos_firebase_TODOS.json";
-      
-      await Clipboard.setStringAsync(jsonString);
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert("Error", "La función Compartir/Guardar no está disponible.");
-        return;
-      }
-      const fileUri = FileSystem.cacheDirectory + baseFileName;
-      await FileSystem.writeAsStringAsync(fileUri, jsonString);
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'application/json',
-        dialogTitle: 'Compartir TODOS los datos de Firebase (JSON)'
-      });
-      Alert.alert("Éxito", "Todos los datos han sido copiados y están listos para compartir.");
-    } catch (error) {
-      console.error("Error al exportar o compartir todo:", error);
-      Alert.alert("Error al exportar todo", error.message);
-    }
-  };
-
-  // --- NUEVAS FUNCIONES PARA PDF ---
-
+  // PDF Específico de Productos (se queda aquí porque usa el state 'productos')
   const generarHTMLParaProductos = (data) => {
     let tableRows = '';
     data.forEach(prod => {
@@ -271,82 +188,14 @@ const Productos = () => {
       Alert.alert("Error", "No se pudo generar el PDF: " + error.message);
     }
   };
-
-  const generarHTMLParaTodo = (datos) => {
-      let htmlContent = `
-        <html>
-          <head>
-            <meta charset="UTF-8">
-            <style>
-              body { font-family: sans-serif; margin: 20px; }
-              h1 { text-align: center; color: #1e3a8a; }
-              h2 { text-transform: capitalize; color: #333; border-bottom: 2px solid #eee; padding-bottom: 5px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; word-break: break-word; }
-              th { background-color: #f4f4f4; color: #333; }
-              tr:nth-child(even) { background-color: #f9f9f9; }
-            </style>
-          </head>
-          <body>
-            <h1>Reporte Completo de Firebase</h1>
-      `;
-
-      for (const coleccionNombre in datos) {
-        const items = datos[coleccionNombre];
-        if (!items || items.length === 0) {
-          htmlContent += `<h2>${coleccionNombre}</h2><p>No hay datos.</p>`;
-          continue;
-        }
-
-        htmlContent += `<h2>${coleccionNombre}</h2>`;
-        htmlContent += `<table><thead><tr>`;
-
-        const headers = Object.keys(items[0]);
-        headers.forEach(header => {
-          htmlContent += `<th>${header}</th>`;
-        });
-        htmlContent += `</tr></thead><tbody>`;
-
-        items.forEach(item => {
-          htmlContent += `<tr>`;
-          headers.forEach(header => {
-            let valor = item[header];
-            if (typeof valor === 'object' && valor !== null) {
-              valor = JSON.stringify(valor);
-            }
-            htmlContent += `<td>${valor || ''}</td>`;
-          });
-          htmlContent += `</tr>`;
-        });
-        htmlContent += `</tbody></table>`;
-      }
-      htmlContent += `</body></html>`;
-      return htmlContent;
-  };
   
-  const exportarTodoPDF = async () => {
-      const datos = await cargarTODOSDatosFirebase();
-      if (!datos || Object.keys(datos).length === 0) {
-        Alert.alert("Sin datos", "No hay datos de ninguna colección para exportar.");
-        return;
-      }
-      try {
-        const htmlContent = generarHTMLParaTodo(datos);
-        const { uri } = await Print.printToFileAsync({ html: htmlContent, base64: false });
-        if (!(await Sharing.isAvailableAsync())) {
-          Alert.alert("Error", "La función Compartir no está disponible.");
-          return;
-        }
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Exportar Todo (PDF)',
-          UTI: '.pdf'
-        });
-      } catch (error) {
-        console.error("Error al generar PDF de TODO:", error);
-        Alert.alert("Error", "No se pudo generar el PDF: " + error.message);
-      }
+  // *** ¡NUEVA FUNCIÓN PARA EL BOTÓN EXCEL! ***
+  const exportarProductosExcel = () => {
+    // Llama a la función importada pasándole los datos del state
+    exportarDatosExcel(productos, "reporte_productos.xlsx");
   };
+
+  // --- FIN FUNCIONES DE EXPORTACIÓN ---
 
 
   return (
@@ -357,7 +206,7 @@ const Productos = () => {
         guardarProducto={guardarProducto}
         actualizarProducto={actualizarProducto}
         modoEdicion={modoEdicion}
-        cancelarEdicion={() => { // <-- Añadido Cancelar
+        cancelarEdicion={() => {
           setNuevoProducto({nombre: "", precio: "", stock: ""});
           setModoEdicion(false);
           setProductoId(null);
@@ -370,36 +219,41 @@ const Productos = () => {
           Opciones de Exportación
         </Text>
         <View style={{gap: 8}}>
-          <Button 
-            title="Exportar 'productos' (JSON)" 
-            onPress={() => exportarColeccion("productos")} 
-            color="#3b82f6"
-          />
-          <Button 
-            title="Exportar 'usuarios' (JSON)" 
-            onPress={() => exportarColeccion("usuarios")} 
-            color="#1d4ed8"
-          />
+          {/* --- ¡NUEVO BOTÓN DE EXCEL! --- */}
            <Button 
-            title="Exportar 'ciudades' (JSON)" 
-            onPress={() => exportarColeccion("ciudades")} 
-            color="#047857"
+            title="Exportar Productos (Excel)" 
+            onPress={exportarProductosExcel} 
+            color="#10B981" // Verde
           />
-          <Button 
-            title="Exportar TODO (JSON)" 
-            onPress={exportarTodosLosDatos} 
-            color="#166534"
-          />
-          {/* --- NUEVOS BOTONES PDF --- */}
           <Button 
             title="Exportar Productos (PDF)" 
             onPress={exportarProductosPDF} 
             color="#ef4444" // Rojo
           />
            <Button 
+            title="Exportar 'productos' (JSON)" 
+            onPress={() => exportarColeccionJSON("productos")} 
+            color="#3b82f6" // Azul
+          />
+          <Button 
+            title="Exportar 'usuarios' (JSON)" 
+            onPress={() => exportarColeccionJSON("usuarios")} 
+            color="#1d4ed8"
+          />
+           <Button 
+            title="Exportar 'ciudades' (JSON)" 
+            onPress={() => exportarColeccionJSON("ciudades")} 
+            color="#047857"
+          />
+          <Button 
             title="Exportar TODO (PDF)" 
-            onPress={exportarTodoPDF} 
+            onPress={() => exportarTodoPDF(colecciones)} 
             color="#b91c1c" // Rojo Oscuro
+          />
+          <Button 
+            title="Exportar TODO (JSON)" 
+            onPress={() => exportarTodosLosDatosJSON(colecciones)} 
+            color="#166534"
           />
         </View>
       </View>
