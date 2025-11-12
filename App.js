@@ -13,6 +13,7 @@ import Usuarios from './src/views/Usuarios';
 import Productos from './src/views/Productos';
 import Login from './src/views/Login';
 import ProductosRealtime from './src/views/ProductosRealtime';
+import IMC from './src/views/IMC'; // Importar la nueva vista IMC
 
 const Tab = createBottomTabNavigator();
 
@@ -29,6 +30,8 @@ function MainAppNavigator({ cerrarSesion }) {
             iconName = focused ? 'cube' : 'cube-outline';
           } else if (route.name === 'RT-DB') {
             iconName = focused ? 'logo-firebase' : 'logo-firebase';
+          } else if (route.name === 'IMC') {
+            iconName = focused ? 'calculator' : 'calculator-outline';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -58,6 +61,11 @@ function MainAppNavigator({ cerrarSesion }) {
         name="RT-DB" 
         component={ProductosRealtime}
         options={{ title: 'Productos Realtime' }}
+      />
+      <Tab.Screen 
+        name="IMC" 
+        component={IMC}
+        options={{ title: 'Calculadora IMC' }}
       />
     </Tab.Navigator>
   );
