@@ -1,44 +1,29 @@
-import { initializeApp, getApps, getApp } from 'firebase/app'; // Importar getApps y getApp
-import { getFirestore } from 'firebase/firestore';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { initializeApp } from "firebase/app";
+import { initializeAuth, getReactNativePersistence } from "firebase/auth"; // Importar initializeAuth y getReactNativePersistence
+import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database"; // 1. Importar getDatabase
+import Constants from "expo-constants";
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'; // Importar AsyncStorage
 
-import {
-  initializeAuth,
-  getReactNativePersistence,
-  indexedDBLocalPersistence
-} from 'firebase/auth';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+// Tus variables de config
+const firebaseConfig = {
+  apiKey: Constants.expoConfig.extra.FIREBASE_API_KEY,
+  authDomain: Constants.expoConfig.extra.FIREBASE_AUTH_DOMAIN,
+  projectId: Constants.expoConfig.extra.FIREBASE_PROJECT_ID,
+  storageBucket: Constants.expoConfig.extra.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: Constants.expoConfig.extra.FIREBASE_MESSAGING_SENDER_ID,
+  appId: Constants.expoConfig.extra.FIREBASE_APP_ID,
+  databaseURL: Constants.expoConfig.extra.FIREBASE_DATABASE_URL, // 2. Agregar databaseURL
+};
 
-const { extra } = Constants.expoConfig || {};
-const firebaseConfig = extra?.firebase;
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+}); // Configurar autenticación con persistencia
+const db = getFirestore(app); // Tu instancia de Firestore (la dejamos como está)
 
-if (!firebaseConfig?.apiKey) {
-  throw new Error('Configuración de Firebase no encontrada.');
-}
+// 3. Crear y exportar instancia de Realtime DB
+const realtimeDB = getDatabase(app);
 
-// Declarar las variables que vamos a exportar
-let app;
-let auth;
-let db;
-
-// Verificar si Firebase ya ha sido inicializado
-if (getApps().length === 0) {
-  // Si no hay apps inicializadas, inicializar una nueva
-  app = initializeApp(firebaseConfig);
-} else {
-  // Si ya existe, simplemente obtener la instancia de la app existente
-  app = getApp();
-}
-
-// Usar la instancia de la app (nueva o existente) para inicializar los servicios
-auth = initializeAuth(app, {
-  persistence: Platform.OS === 'web'
-    ? indexedDBLocalPersistence
-    : getReactNativePersistence(ReactNativeAsyncStorage)
-});
-
-db = getFirestore(app);
-
-// Exportar las instancias
-export { app, auth, db };
+export { app, auth, db, realtimeDB }; // 4. Exportar realtimeDB

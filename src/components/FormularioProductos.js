@@ -6,7 +6,8 @@ const FormularioProductos = ({
   manejoCambio, 
   guardarProducto, 
   actualizarProducto, 
-  modoEdicion 
+  modoEdicion,
+  cancelarEdicion
 }) => {
   return (
     <View style={styles.container}>
@@ -47,6 +48,15 @@ const FormularioProductos = ({
             color="#3b82f6"
           />
         </View>
+        {modoEdicion && (
+          <View style={styles.buttonContainer}>
+            <Button
+              title="Cancelar"
+              onPress={cancelarEdicion}
+              color="#ef4444"
+            />
+          </View>
+        )}
       </View>
     </View>
   );

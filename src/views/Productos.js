@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Button, Alert, Text } from "react-native"; 
+import { View, StyleSheet, Button, Alert, Text, ScrollView } from "react-native"; 
 import { db } from "../../firebaseconfig";
 import { collection, getDocs, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore'; // Imports limpiados
 import FormularioProductos from "../components/FormularioProductos";
@@ -199,7 +199,7 @@ const Productos = () => {
 
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <FormularioProductos
         nuevoProducto={nuevoProducto}
         manejoCambio={manejoCambio}
@@ -265,7 +265,7 @@ const Productos = () => {
         editarProducto={editarProducto}
         cargarDatos={cargarDatos}
       />
-    </View>
+    </ScrollView>
   );
 };
 

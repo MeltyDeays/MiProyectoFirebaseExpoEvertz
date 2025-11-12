@@ -10,8 +10,9 @@ import { auth } from './firebaseconfig';
 
 // Importa tus vistas
 import Usuarios from './src/views/Usuarios'; 
-import Productos from './src/views/Productos'; 
+import Productos from './src/views/Productos';
 import Login from './src/views/Login';
+import ProductosRealtime from './src/views/ProductosRealtime';
 
 const Tab = createBottomTabNavigator();
 
@@ -26,6 +27,8 @@ function MainAppNavigator({ cerrarSesion }) {
             iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Productos') {
             iconName = focused ? 'cube' : 'cube-outline';
+          } else if (route.name === 'RT-DB') {
+            iconName = focused ? 'logo-firebase' : 'logo-firebase';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -50,6 +53,11 @@ function MainAppNavigator({ cerrarSesion }) {
         name="Productos" 
         component={Productos}
         options={{ title: 'Inventario de Productos' }}
+      />
+      <Tab.Screen 
+        name="RT-DB" 
+        component={ProductosRealtime}
+        options={{ title: 'Productos Realtime' }}
       />
     </Tab.Navigator>
   );
